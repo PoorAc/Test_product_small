@@ -112,8 +112,8 @@ services:
     hostname: milvus.project.demo
     command: ["milvus", "run", "standalone"]
     environment:
-      ETCD_ENDPOINTS: etcd.project.demo:2379
-      MINIO_ADDRESS: minio.project.demo:9000
+      ETCD_ENDPOINTS: etcd:2379
+      MINIO_ADDRESS: minio:9000
     ports:
       - "19530:19530"
     depends_on:
@@ -134,9 +134,9 @@ services:
     restart: always
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
-      MINIO_ENDPOINT: minio.project.demo
-      TEMPORAL_ENDPOINT: temporal.project.demo
-      MILVUS_ENDPOINT: milvus.project.demo
+      MINIO_ENDPOINT: minio:9000
+      TEMPORAL_ENDPOINT: temporal:7233
+      MILVUS_ENDPOINT: milvus:19530
       OPENAI_API_KEY: ${OPENAI_API_KEY}
     command: >
       sh -c "sleep 10 && uvicorn main:app --host 0.0.0.0 --port 8000"
@@ -165,7 +165,7 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
-      TEMPORAL_ENDPOINT: temporal.project.demo
+      TEMPORAL_ENDPOINT: temporal:7233
     depends_on:
       - backend
     networks:

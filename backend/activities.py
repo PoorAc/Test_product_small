@@ -8,7 +8,7 @@ from openai import OpenAI
 
 from dotenv import load_dotenv
 
-load_dotenv(".env.local")
+load_dotenv(".env")
 
 user = os.environ["POSTGRES_USER"]
 password = os.environ["POSTGRES_PASSWORD"]
@@ -16,7 +16,7 @@ db = os.environ["POSTGRES_DB"]
 
 # Setup internal clients
 storage_client = Minio(
-    "minio.project.demo",
+    "minio:9000",
     access_key="minioadmin",
     secret_key="minioadmin",
     secure=False

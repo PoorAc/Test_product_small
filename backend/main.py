@@ -4,6 +4,7 @@ import os
 from datetime import datetime
 from typing import List, Optional
 from contextlib import asynccontextmanager
+import shutil
 
 from fastapi import FastAPI, UploadFile, Depends, HTTPException, File
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,7 +18,7 @@ from workflow import MediaProcessingWorkflow
 # --- 1. CONFIGURATION ---
 from dotenv import load_dotenv
 
-load_dotenv(".env.local")
+load_dotenv(".env")
 
 user = os.environ["POSTGRES_USER"]
 password = os.environ["POSTGRES_PASSWORD"]
@@ -27,7 +28,7 @@ DATABASE_URL = f"postgresql://{user}:{password}@db:5432/{db}"
 engine = create_engine(DATABASE_URL)
 
 storage_client = Minio(
-    "minio.project.demo",
+    "minio:9000",
     access_key="minioadmin",
     secret_key="minioadmin",
     secure=False
@@ -86,6 +87,18 @@ app.add_middleware(
 def get_session():
     with Session(engine) as session:
         yield session
+    
+UPLOAD_DIR = "uploads"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+def is_valid_media(file: UploadFile) -> bool:
+    return (
+        file.content_type
+        and (
+            file.content_type.startswith("audio/")
+            or file.content_type.startswith("video/")
+        )
+    )
 
 # --- 5. API ENDPOINTS ---
 
@@ -151,3 +164,39 @@ async def delete_media(file_id: str, session: Session = Depends(get_session)):
     session.delete(record)
     session.commit()
     return {"status": "deleted"}
+
+@app.post("/upload")
+async def upload_files(files: List[UploadFile] = File(...)):
+    if not files:
+        raise HTTPException(status_code=400, detail="No files uploaded")
+
+    results = []
+
+    for file in files:
+        if not is_valid_media(file):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid file type: {file.filename}",
+            )
+
+        ext = os.path.splitext(file.filename)[1]
+        filename = f"{uuid.uuid4()}{ext}"
+        file_path = os.path.join(UPLOAD_DIR, filename)
+
+        try:
+            with open(file_path, "wb") as buffer:
+                await file.seek(0)
+                shutil.copyfileobj(file.file, buffer)
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to save {file.filename}",
+            )
+
+        # Placeholder transcript
+        results.append({
+            "filename": file.filename,
+            "transcript": f"Transcript for {file.filename}",
+        })
+
+    return results

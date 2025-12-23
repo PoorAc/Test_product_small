@@ -2,7 +2,7 @@ from sqlmodel import create_engine, SQLModel, Session
 import os
 from dotenv import load_dotenv
 
-load_dotenv(".env.local")
+load_dotenv(".env")
 
 user = os.environ["POSTGRES_USER"]
 password = os.environ["POSTGRES_PASSWORD"]
