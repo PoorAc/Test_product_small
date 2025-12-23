@@ -9,7 +9,7 @@ from activities import MediaActivities
 async def main():
     # 1. Connect to the Temporal Server
     # By default, it looks for localhost:7233
-    client = await Client.connect("localhost:7233")
+    client = await Client.connect("temporal.project.demo")
 
     # 2. Initialize the Activities class
     activities = MediaActivities()

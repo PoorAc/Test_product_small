@@ -7,7 +7,7 @@ from temporal_workers.activities import extract_thumbnail, transcribe_media, sto
 
 async def main():
     # Connect to Temporal Server
-    client = await Client.connect(os.getenv("TEMPORAL_ENDPOINT", "localhost:7233"))
+    client = await Client.connect(os.getenv("TEMPORAL_ENDPOINT", "temporal:7233"))
 
     # Create the Worker
     worker = Worker(

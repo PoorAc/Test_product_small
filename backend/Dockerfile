@@ -10,6 +10,12 @@ RUN apt-get update && apt-get install -y \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
+# Install ping and net tools to be able to ping each other
+RUN apt-get update && apt-get install -y \
+    net-tools \
+    iputils-ping \
+    && rm -rf /var/lib/apt/lists/*
+
 # Copy requirements and install
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt

@@ -1,8 +1,11 @@
 services:
+  # =========================
   # Database Service
+  # =========================
   db:
     image: postgres:16-alpine
-    container_name: app_postgres
+    container_name: app_db
+    hostname: db.project.demo
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -10,24 +13,28 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
       - app-network
 
-  # Identity Provider Service
+  # =========================
+  # Keycloak (Identity Provider)
+  # =========================
   keycloak:
     image: quay.io/keycloak/keycloak:26.0
     container_name: app_keycloak
-    command: start-dev
+    hostname: keycloak.project.demo
+    command: start-dev --http-enabled=true
     environment:
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://db:5432/${POSTGRES_DB}
       KC_DB_USERNAME: ${POSTGRES_USER}
       KC_DB_PASSWORD: ${POSTGRES_PASSWORD}
-      KC_HOSTNAME: localhost
+      KC_HOSTNAME_STRICT: "false"
+      KC_HOSTNAME_STRICT_HTTPS: "false"
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN}
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
     ports:
@@ -38,61 +45,99 @@ services:
     networks:
       - app-network
 
-  # Temporal Cluster (Auto-setup for local dev)
+  # =========================
+  # Temporal Server (Auto-setup)
+  # =========================
   temporal:
-    image: temporalio/admin-tools:1.27.0
+    image: temporalio/auto-setup:1.27.0
     container_name: app_temporal
+    hostname: temporal.project.demo
     environment:
-      - DB=postgresql
-      - DB_PORT=5432
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PWD=${POSTGRES_PASSWORD}
-      - POSTGRES_SEEDS=db
-      - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development-sql.yaml
+      DB: postgres12
+      DB_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PWD: ${POSTGRES_PASSWORD}
+      POSTGRES_SEEDS: db
     ports:
-      - "7233:7233" # gRPC port for your Python code to talk to
-      - "8088:8080" # Temporal Web UI
+      - "7233:7233"
+      - "8088:8080"
     depends_on:
       db:
         condition: service_healthy
     networks:
       - app-network
 
-  # etcd for Milvus Metadata
+  # =========================
+  # etcd (Milvus metadata)
+  # =========================
   etcd:
     image: quay.io/coreos/etcd:v3.5.5
+    container_name: app_etcd
+    hostname: etcd.project.demo
     environment:
-      - ETCD_AUTO_COMPACTION_MODE=revision
-      - ETCD_AUTO_COMPACTION_RETENTION=1000
+      ETCD_AUTO_COMPACTION_MODE: revision
+      ETCD_AUTO_COMPACTION_RETENTION: "1000"
+    command: >
+      etcd
+      --advertise-client-urls http://0.0.0.0:2379
+      --listen-client-urls http://0.0.0.0:2379
     networks:
       - app-network
 
-  # MinIO for Milvus and app
+  # =========================
+  # MinIO
+  # =========================
   minio:
     image: minio/minio:latest
+    container_name: app_minio
+    hostname: minio.project.demo
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadminpassword
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     command: server /data --console-address ":9001"
     ports:
-      - "9000:9000" # API
-      - "9001:9001" # Dashboard
+      - "9000:9000"
+      - "9001:9001"
     networks:
       - app-network
 
-  # FastAPI Backend Service
+  # =========================
+  # Milvus
+  # =========================
+  milvus:
+    image: milvusdb/milvus:v2.4.0
+    container_name: app_milvus
+    hostname: milvus.project.demo
+    command: ["milvus", "run", "standalone"]
+    environment:
+      ETCD_ENDPOINTS: etcd.project.demo:2379
+      MINIO_ADDRESS: minio.project.demo:9000
+    ports:
+      - "19530:19530"
+    depends_on:
+      - etcd
+      - minio
+    networks:
+      - app-network
+
+  # =========================
+  # FastAPI Backend
+  # =========================
   backend:
-    build: 
+    build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: app_backend
+    hostname: backend.project.demo
     restart: always
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
-      - MINIO_ENDPOINT=minio:9000
-      - TEMPORAL_ENDPOINT=temporal:7233
-      - MILVUS_ENDPOINT=milvus:19530
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      MINIO_ENDPOINT: minio.project.demo
+      TEMPORAL_ENDPOINT: temporal.project.demo
+      MILVUS_ENDPOINT: milvus.project.demo
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+    command: >
+      sh -c "sleep 10 && uvicorn main:app --host 0.0.0.0 --port 8000"
     ports:
       - "8000:8000"
     depends_on:
@@ -105,36 +150,28 @@ services:
     networks:
       - app-network
 
-  # The Worker needs the key to talk to Whisper/GPT
+  # =========================
+  # Worker
+  # =========================
   worker:
     build: ./backend
     container_name: app_worker
+    hostname: worker.project.demo
     restart: always
-    command: python worker.py # Run the worker script instead of the FastAPI app
+    command: >
+      sh -c "sleep 15 && python worker.py"
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - TEMPORAL_ENDPOINT=temporal:7233
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      TEMPORAL_ENDPOINT: temporal.project.demo
     depends_on:
       - backend
     networks:
       - app-network
-      
-  # Milvus config
-  milvus:
-    image: milvusdb/milvus:v2.4.0
-    command: ["milvus", "run", "standalone"]
-    environment:
-      ETCD_ENDPOINTS: etcd:2379
-      MINIO_ADDRESS: minio:9000
-    ports:
-      - "19530:19530"
-    depends_on:
-      - "etcd"
-      - "minio"
-    networks:
-      - app-network
 
+# =========================
+# Networks & Volumes
+# =========================
 networks:
   app-network:
     driver: bridge

@@ -27,7 +27,7 @@ DATABASE_URL = f"postgresql://{user}:{password}@db:5432/{db}"
 engine = create_engine(DATABASE_URL)
 
 storage_client = Minio(
-    "localhost:9000",
+    "minio.project.demo",
     access_key="minioadmin",
     secret_key="minioadmin",
     secure=False
@@ -49,7 +49,7 @@ async def lifespan(app: FastAPI):
     
     # Connect to Temporal Server
     try:
-        temporal_state["client"] = await TemporalClient.connect("localhost:7233")
+        temporal_state["client"] = await TemporalClient.connect("temporal.project.demo")
         print("✅ Connected to Temporal Server")
     except Exception as e:
         print(f"❌ Could not connect to Temporal: {e}")

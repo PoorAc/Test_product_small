@@ -16,7 +16,7 @@ db = os.environ["POSTGRES_DB"]
 
 # Setup internal clients
 storage_client = Minio(
-    "localhost:9000",
+    "minio.project.demo",
     access_key="minioadmin",
     secret_key="minioadmin",
     secure=False
