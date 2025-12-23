@@ -26,7 +26,7 @@ const HistoryPage = () => {
   const fetchHistory = async () => {
     setIsLoading(true);
     try {
-      const response = await axios.get('http://localhost:8000/history');
+      const response = await axios.get('backend.project.demo/history');
       setHistory(response.data);
       setError(null);
     } catch (err) {
@@ -44,7 +44,7 @@ const HistoryPage = () => {
   // 2. Delete logic (Real API call + Optimistic UI)
   const deleteItem = async (id: string) => {
     try {
-      await axios.delete(`http://localhost:8000/media/${id}`);
+      await axios.delete(`backend.project.demo/media/${id}`);
       setHistory(prev => prev.filter(item => item.id !== id));
       if (selectedItem?.id === id) setSelectedItem(null);
     } catch (err) {
