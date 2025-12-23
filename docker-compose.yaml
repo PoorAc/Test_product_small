@@ -44,6 +44,8 @@ services:
         condition: service_healthy
     networks:
       - app-network
+    volumes:
+      - ./keycloak/themes:/opt/keycloak/themes
 
   # =========================
   # Temporal Server (Auto-setup)
