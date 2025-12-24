@@ -5,11 +5,19 @@ from temporalio.worker import Worker
 # Import our workflow and activities
 from workflow import MediaProcessingWorkflow
 from activities import MediaActivities
+from config import (
+    TEMPORAL_ENDPOINT,
+    TEMPORAL_NAMESPACE,
+    MEDIA_TASK_QUEUE,
+)
 
 async def main():
-    # 1. Connect to the Temporal Server
-    # By default, it looks for localhost:7233
-    client = await Client.connect("temporal.project.demo")
+    
+    client = await Client.connect(
+                TEMPORAL_ENDPOINT,
+                namespace=TEMPORAL_NAMESPACE
+            )
+
 
     # 2. Initialize the Activities class
     activities = MediaActivities()
@@ -18,15 +26,17 @@ async def main():
     # It will listen to the "media-task-queue"
     worker = Worker(
         client,
-        task_queue="media-task-queue",
+        task_queue=MEDIA_TASK_QUEUE,
         workflows=[MediaProcessingWorkflow],
         activities=[
             activities.download_from_minio,
             activities.transcribe_audio,
             activities.summarize_transcript,
             activities.update_db_status,
+            activities.mark_failed,
         ],
     )
+
 
     print("🚀 DurableAI Worker is running and listening for tasks...")
     

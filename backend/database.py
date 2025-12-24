@@ -1,21 +1,23 @@
-from sqlmodel import create_engine, SQLModel, Session
+# database.py
 import os
+from sqlmodel import SQLModel, Session, create_engine
 from dotenv import load_dotenv
+
+from config import DATABASE_URL
 
 load_dotenv(".env")
 
-user = os.environ["POSTGRES_USER"]
-password = os.environ["POSTGRES_PASSWORD"]
-db = os.environ["POSTGRES_DB"]
+engine = create_engine(
+    DATABASE_URL,
+    echo=False,          
+    pool_pre_ping=True   
+)
 
-# Database URL (Matches the Postgres container in your docker-compose)
-sqlite_url = f"postgresql://{user}:{password}@db:5432/{db}"
-
-engine = create_engine(sqlite_url, echo=True)
-
-def init_db():
+def init_db() -> None:
+    """Create tables (called once at startup)."""
     SQLModel.metadata.create_all(engine)
 
 def get_session():
+    """FastAPI / general-purpose session dependency."""
     with Session(engine) as session:
         yield session
