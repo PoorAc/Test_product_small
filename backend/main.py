@@ -12,6 +12,7 @@ from temporalio.client import Client as TemporalClient
 from workflow import MediaProcessingWorkflow
 from models import MediaRecord
 from database import get_session, init_db
+from schemas import MediaDetails, MediaHistoryItem
 from config import (
     MINIO_ENDPOINT,
     MINIO_ACCESS_KEY,
@@ -157,12 +158,15 @@ async def upload_media(
     }
 
 
-@app.get("/history", response_model=List[MediaRecord])
+@app.get("/history", response_model=list[MediaHistoryItem])
 async def get_history(session: Session = Depends(get_session)):
-    statement = select(MediaRecord).order_by(MediaRecord.created_at.desc())
+    statement = (
+        select(MediaRecord)
+        .order_by(MediaRecord.created_at.desc())
+    )
     return session.exec(statement).all()
 
-@app.get("/media/{file_id}/results", response_model=MediaRecord)
+@app.get("/media/{file_id}/results", response_model=MediaDetails)
 async def get_results(file_id: str, session: Session = Depends(get_session)):
     record = session.get(MediaRecord, file_id)
     if not record:

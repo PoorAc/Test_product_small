@@ -1,5 +1,5 @@
-# Use a lightweight Python image
-FROM python:3.13.7
+# Use a CUDA compatible Python image
+FROM python:3.12.10
 
 # Set the working directory
 WORKDIR /app
