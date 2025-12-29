@@ -8,16 +8,19 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     libpq-dev \
     gcc \
+    net-tools \
+    iputils-ping \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 # Install ping and net tools to be able to ping each other
-RUN apt-get update && apt-get install -y \
-    net-tools \
-    iputils-ping \
-    && rm -rf /var/lib/apt/lists/*
+RUN apt update && apt install -y \
+    nano
 
 # Copy requirements and install
 COPY requirements.txt .
+RUN pip install --upgrade pip
+RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of your backend code

@@ -1,4 +1,5 @@
 .env
+/backend/.env
 /backend/test.py
 /backend/clean.wav
 /backend/output.txt

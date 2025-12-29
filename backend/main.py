@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from typing import List
 from sqlmodel import Session, select
 from fastapi import FastAPI, UploadFile, Depends, HTTPException, File
+from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
 from minio import Minio
 from temporalio.client import Client as TemporalClient
@@ -187,3 +188,42 @@ async def delete_media(file_id: str, session: Session = Depends(get_session)):
     session.delete(record)
     session.commit()
     return {"status": "deleted"}
+
+
+@app.get("/media/{file_id}/transcript/download")
+async def download_transcript(
+    file_id: str,
+    session: Session = Depends(get_session),
+):
+    record = session.get(MediaRecord, file_id)
+
+    if not record:
+        raise HTTPException(status_code=404, detail="Media not found")
+
+    if record.status == "PROCESSING":
+        raise HTTPException(
+            status_code=409,
+            detail="Transcript not ready yet",
+        )
+
+    if record.status == "FAILED":
+        raise HTTPException(
+            status_code=400,
+            detail="Transcript generation failed",
+        )
+
+    if not record.transcript:
+        raise HTTPException(
+            status_code=404,
+            detail="Transcript is empty or unavailable",
+        )
+
+    filename = f"{record.filename}.txt"
+
+    return Response(
+        content=record.transcript,
+        media_type="text/plain",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"'
+        },
+    )

@@ -1,10 +1,13 @@
 import os
 from temporalio import activity
 from minio import Minio
+import whisper
+import torch
 from openai import OpenAI
 from sqlmodel import Session, select
 import tempfile
 import uuid
+import subprocess
 
 from database import engine
 from models import MediaRecord
@@ -16,6 +19,8 @@ from config import (
     OPENAI_API_KEY,
 )
 
+
+
 storage_client = Minio(
     MINIO_ENDPOINT,
     access_key=MINIO_ACCESS_KEY,
@@ -25,8 +30,10 @@ storage_client = Minio(
 
 if not OPENAI_API_KEY:
     raise ValueError("OPENAI_API_KEY is not set")
-
 ai_client = OpenAI(api_key=OPENAI_API_KEY)
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+model = whisper.load_model("medium", device=device)
 
 class MediaActivities:
     @activity.defn
@@ -40,18 +47,60 @@ class MediaActivities:
 
         activity.logger.info(f"Downloaded {s3_key} → {local_path}")
         return local_path
+    
+    @activity.defn
+    async def preprocess_audio(self, input_path: str) -> str:
+        """
+        Cleans and converts audio to WAV using ffmpeg.
+        """
+        output_path = f"{os.path.dirname(input_path)}/clean_{uuid.uuid4()}.wav"
+
+        cmd = [
+            "ffmpeg",
+            "-y",                     # overwrite if exists
+            "-i", input_path,
+            "-af", "highpass=200, lowpass=3000",
+            output_path,
+        ]
+
+        activity.logger.info(f"Running ffmpeg: {' '.join(cmd)}")
+
+        try:
+            subprocess.run(
+                cmd,
+                check=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+            )
+        except subprocess.CalledProcessError as err:
+            activity.logger.error(err.stderr.decode())
+            raise RuntimeError("Audio preprocessing failed")
+
+        return output_path
 
     @activity.defn
     async def transcribe_audio(self, local_path: str) -> str:
         """Uses OpenAI Whisper to turn audio/video into text."""
         try:
             with open(local_path, "rb") as audio_file:
-                transcript = ai_client.audio.transcriptions.create(
-                    model="whisper-1",
-                    file=audio_file
-                )
+                transcript = model.transcribe(
+            audio_file,
+            language="en",
+            task="transcribe",
+            fp16=True,
+            condition_on_previous_text=False,
+        )
 
-            return transcript.text
+            result = ""
+
+            for segment in transcript["segments"]:
+                start = segment["start"]
+                end = segment["end"]
+                text = segment["text"]
+                
+                result += f"[{start:7.2f} → {end:7.2f}] {text}\n"
+            
+            return result
 
         finally:
             # Always clean up, even on failure or retry

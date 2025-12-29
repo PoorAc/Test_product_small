@@ -1,12 +1,16 @@
 import { useEffect, useState } from "react";
+
 import {
   fetchHistory,
   fetchMediaDetails,
+  deleteMedia,
+  downloadTranscript,
 } from "../api/history";
+
 import type {
-  MediaDetails,
   MediaHistoryItem,
-} from "../api/history"
+  MediaDetails,
+} from "../api/history";
 
 /* -----------------------------
    Status color helper
@@ -62,6 +66,39 @@ export const HistoryPage = () => {
     }
   };
 
+  /* -----------------------------
+     Delete media
+  ----------------------------- */
+  const handleDelete = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this item?")) {
+      return;
+    }
+
+    try {
+      await deleteMedia(id);
+
+      setItems((prev) => prev.filter((item) => item.id !== id));
+
+      if (expandedId === id) {
+        setExpandedId(null);
+        setDetails(null);
+      }
+    } catch (e: any) {
+      setError(e.message);
+    }
+  };
+
+  /* -----------------------------
+     Download transcript
+  ----------------------------- */
+  const handleDownload = async (id: string) => {
+    try {
+      await downloadTranscript(id);
+    } catch (e: any) {
+      setError(e.message);
+    }
+  };
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <h1 className="text-3xl font-bold">History</h1>
@@ -72,12 +109,20 @@ export const HistoryPage = () => {
         </div>
       )}
 
+      {items.length === 0 && (
+        <div className="text-slate-400">
+          No history items yet.
+        </div>
+      )}
+
       {items.map((item) => (
         <div
           key={item.id}
           className="border border-slate-800 rounded-xl p-4"
         >
-          {/* ---- Row ---- */}
+          {/* -----------------------------
+              Row
+          ----------------------------- */}
           <div className="flex items-center justify-between">
             <div>
               <div className="font-medium text-slate-200">
@@ -90,15 +135,38 @@ export const HistoryPage = () => {
               </div>
             </div>
 
-            <button
-              onClick={() => toggleExpand(item.id)}
-              className="text-sm text-indigo-400 hover:underline"
-            >
-              {expandedId === item.id ? "Hide" : "View"}
-            </button>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => toggleExpand(item.id)}
+                className="text-sm text-indigo-400 hover:underline"
+              >
+                {expandedId === item.id ? "Hide" : "View"}
+              </button>
+
+              <button
+                onClick={() => handleDownload(item.id)}
+                disabled={item.status !== "COMPLETED"}
+                className={`text-sm ${
+                  item.status === "COMPLETED"
+                    ? "text-green-400 hover:underline"
+                    : "text-slate-500 cursor-not-allowed"
+                }`}
+              >
+                Download
+              </button>
+
+              <button
+                onClick={() => handleDelete(item.id)}
+                className="text-sm text-red-400 hover:underline"
+              >
+                Delete
+              </button>
+            </div>
           </div>
 
-          {/* ---- Expanded View ---- */}
+          {/* -----------------------------
+              Expanded view
+          ----------------------------- */}
           {expandedId === item.id && (
             <div className="mt-4 bg-slate-900 rounded-lg p-4 space-y-4">
               {loadingDetails && (
@@ -149,7 +217,7 @@ export const HistoryPage = () => {
                     Tokens used: {details.tokens}
                   </div>
 
-                  {/* Status hint */}
+                  {/* Status hints */}
                   {details.status === "PROCESSING" && (
                     <div className="text-yellow-400 text-sm">
                       Processing in progress…
@@ -158,7 +226,7 @@ export const HistoryPage = () => {
 
                   {details.status === "FAILED" && (
                     <div className="text-red-400 text-sm">
-                      Processing failed.
+                      Transcript generation failed.
                     </div>
                   )}
                 </>

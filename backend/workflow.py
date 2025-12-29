@@ -1,5 +1,6 @@
 from datetime import timedelta
 from temporalio import workflow
+from temporalio.common import RetryPolicy
 from typing import Dict
 
 # Safe import of activities for Temporal replay
@@ -19,10 +20,10 @@ class MediaProcessingWorkflow:
     # -----------------------------
     @workflow.run
     async def run(self, s3_key: str, file_id: str) -> Dict[str, str]:
-        retry_policy = {
-            "initial_interval": timedelta(seconds=1),
-            "maximum_attempts": 3,
-        }
+        retry_policy = RetryPolicy(
+            initial_interval=timedelta(seconds=1),
+            maximum_attempts=3,
+        )
 
         try:
             # ---- Step 1: Download ----
@@ -35,19 +36,31 @@ class MediaProcessingWorkflow:
                 start_to_close_timeout=timedelta(minutes=5),
                 retry_policy=retry_policy,
             )
+            
+            # ---- Step 2: Pre-process ----            
+            self.progress = "PREPROCESSING"
+            self._check_cancelled()
 
-            # ---- Step 2: Transcription ----
+            clean_path = await workflow.execute_activity(
+                MediaActivities.preprocess_audio,
+                local_path,
+                start_to_close_timeout=timedelta(minutes=2),
+                retry_policy=retry_policy,
+            )
+
+
+            # ---- Step 3: Transcription ----
             self.progress = "TRANSCRIBING"
             self._check_cancelled()
 
             transcript = await workflow.execute_activity(
                 MediaActivities.transcribe_audio,
-                local_path,
+                clean_path,
                 start_to_close_timeout=timedelta(minutes=20),
                 retry_policy=retry_policy,
             )
 
-            # ---- Step 3: Summarization ----
+            # ---- Step 4: Summarization ----
             self.progress = "SUMMARIZING"
             self._check_cancelled()
 
@@ -58,7 +71,7 @@ class MediaProcessingWorkflow:
                 retry_policy=retry_policy,
             )
 
-            # ---- Step 4: Finalize DB state ----
+            # ---- Step 5: Finalize DB state ----
             self.progress = "FINALIZING"
             self._check_cancelled()
 
@@ -83,7 +96,7 @@ class MediaProcessingWorkflow:
             await workflow.execute_activity(
                 MediaActivities.mark_failed,
                 file_id,
-                str(err),
+                reason=str(err),
                 start_to_close_timeout=timedelta(seconds=30),
             )
 
@@ -95,10 +108,6 @@ class MediaProcessingWorkflow:
     # -----------------------------
     @workflow.query
     def get_progress(self) -> str:
-        """
-        Returns the current progress of the workflow.
-        Safe to call at any time.
-        """
         return self.progress
 
     # -----------------------------
@@ -106,9 +115,6 @@ class MediaProcessingWorkflow:
     # -----------------------------
     @workflow.signal
     def cancel(self) -> None:
-        """
-        Request cooperative cancellation of the workflow.
-        """
         self.cancel_requested = True
 
     # -----------------------------
