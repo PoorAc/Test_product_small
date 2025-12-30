@@ -1,11 +1,8 @@
 # database.py
 import os
 from sqlmodel import SQLModel, Session, create_engine
-from dotenv import load_dotenv
 
 from config import DATABASE_URL
-
-load_dotenv(".env")
 
 engine = create_engine(
     DATABASE_URL,

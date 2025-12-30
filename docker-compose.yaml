@@ -13,7 +13,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -151,6 +151,8 @@ services:
         condition: service_started
     networks:
       - app-network
+    volumes:
+      - ./backend:/app
 
   # =========================
   # Worker
@@ -161,15 +163,33 @@ services:
     hostname: worker.project.demo
     restart: always
     command: >
-      sh -c "sleep 15 && python worker.py"
+      sh -c "sleep 10 && python worker.py"
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       TEMPORAL_ENDPOINT: temporal:7233
+      SUMMARIZER_URL: ${SUMMARIZER_URL}
     depends_on:
       - backend
     networks:
       - app-network
+    volumes:
+      - ./backend:/app
+
+  # =========================
+  # Summarizer
+  # =========================
+
+  summarizer:
+    build: ./summarizer
+    container_name: app_summarizer
+    hostname: summarizer.project.demo
+    networks:
+      - app-network
+    volumes:
+     - ./summarizer:/app
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/docs"]
 
 # =========================
 # Networks & Volumes

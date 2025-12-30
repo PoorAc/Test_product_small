@@ -41,7 +41,7 @@ class MediaProcessingWorkflow:
             self.progress = "PREPROCESSING"
             self._check_cancelled()
 
-            clean_path = await workflow.execute_activity(
+            paths = await workflow.execute_activity(
                 MediaActivities.preprocess_audio,
                 local_path,
                 start_to_close_timeout=timedelta(minutes=2),
@@ -53,9 +53,9 @@ class MediaProcessingWorkflow:
             self.progress = "TRANSCRIBING"
             self._check_cancelled()
 
-            transcript = await workflow.execute_activity(
+            transcripts = await workflow.execute_activity(
                 MediaActivities.transcribe_audio,
-                clean_path,
+                paths,
                 start_to_close_timeout=timedelta(minutes=20),
                 retry_policy=retry_policy,
             )
@@ -66,7 +66,7 @@ class MediaProcessingWorkflow:
 
             summary = await workflow.execute_activity(
                 MediaActivities.summarize_transcript,
-                transcript,
+                transcripts,
                 start_to_close_timeout=timedelta(minutes=2),
                 retry_policy=retry_policy,
             )
@@ -79,7 +79,7 @@ class MediaProcessingWorkflow:
                 MediaActivities.update_db_status,
                 {
                     "file_id": file_id,
-                    "transcript": transcript,
+                    "transcript": transcripts["transcript"],
                     "summary": summary,
                     "status": "COMPLETED",
                 },
@@ -95,8 +95,10 @@ class MediaProcessingWorkflow:
 
             await workflow.execute_activity(
                 MediaActivities.mark_failed,
-                file_id,
-                reason=str(err),
+                {
+                    "file_id" : file_id, 
+                    "reason" : str(err)
+                },
                 start_to_close_timeout=timedelta(seconds=30),
             )
 

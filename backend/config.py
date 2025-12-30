@@ -25,5 +25,5 @@ MINIO_ACCESS_KEY = os.getenv("MINIO_ROOT_USER", "minioadmin")
 MINIO_SECRET_KEY = os.getenv("MINIO_ROOT_PASSWORD", "minioadmin")
 MEDIA_BUCKET = os.getenv("MEDIA_BUCKET", "media-vault")
 
-# --- OpenAI ---
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+# --- Summarizer ---
+SUMMARIZER_URL = os.getenv("SUMMARIZER_URL","http://summarizer:9000/summarize")

@@ -4,7 +4,7 @@ from temporalio.worker import Worker
 
 # Import our workflow and activities
 from workflow import MediaProcessingWorkflow
-from activities import MediaActivities
+from activities import MediaActivities, get_whisper_model
 from config import (
     TEMPORAL_ENDPOINT,
     TEMPORAL_NAMESPACE,
@@ -12,6 +12,8 @@ from config import (
 )
 
 async def main():
+    
+    get_whisper_model()
     
     client = await Client.connect(
                 TEMPORAL_ENDPOINT,
@@ -30,15 +32,16 @@ async def main():
         workflows=[MediaProcessingWorkflow],
         activities=[
             activities.download_from_minio,
+            activities.preprocess_audio,
             activities.transcribe_audio,
             activities.summarize_transcript,
             activities.update_db_status,
-            activities.mark_failed,
+            activities.mark_failed,  
         ],
     )
 
 
-    print("🚀 DurableAI Worker is running and listening for tasks...")
+    print("🚀 DurableAI Workers are running and listening for tasks...")
     
     # Keep the worker running
     await worker.run()
