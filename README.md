@@ -63,6 +63,8 @@ Set the following values for the client:
 ### Step 9: Create a User
 Create a user in the realm, set credentials, and ensure the user is enabled.
 
+Alternatively, you can allow registration in the realm to register directly from the app
+
 ## Using the Application
 
 ### Step 10: Open the App
@@ -80,3 +82,5 @@ You can now upload audio or video files and download the generated transcript.
 - Restart the frontend after any Keycloak configuration changes.
 
 - Stop other services using ports 8080 or 5173 if needed.
+
+- You can use ports other than 8080 and 5173, but make sure to update them where relevant
